@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DASHBOARD ADMINISTRASI PKKS 2026 - SMP NEGERI 3 CISARUA</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel JS untuk JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- SheetJS / XLSX Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const INITIAL_DOCUMENTS = [
+            { id: "1", kode_bukti: "1.1.a", bidang: "Manajerial", nomor_map: "Map 1", nama_indikator: "Dokumen RKJM, RKT, RKAS dan EDS", nama_bukti: "Dokumen RKJM dan RKT Sekolah Tahun 2026", link_dokumen: "https://drive.google.com/file/d/sample1", status: "Lengkap", keterangan_sumber: "Sesuai petunjuk teknis", catatan_verifikasi: "Telah ditandatangani Komite & Kepsek", penanggung_jawab: "Tim Perencana", tanggal_pembaruan: "2026-03-01" },
+            { id: "2", kode_bukti: "1.2.a", bidang: "Manajerial", nomor_map: "Map 1", nama_indikator: "Perumusan Visi dan Misi", nama_bukti: "Notulen Rapat Perumusan Visi Misi", link_dokumen: "https://drive.google.com/file/d/sample2", status: "Proses", keterangan_sumber: "Menunggu tanda tangan", catatan_verifikasi: "Daftar hadir belum lengkap", penanggung_jawab: "Humas", tanggal_pembaruan: "2026-03-02" },
+            { id: "3", kode_bukti: "2.1.a", bidang: "Manajerial", nomor_map: "Map 2", nama_indikator: "Kedisiplinan dan Ketepatan Waktu", nama_bukti: "Jurnal Kehadiran Guru & Staf Tahun 2026", link_dokumen: "", status: "Belum Tersedia", keterangan_sumber: "Belum diunggah ke Drive", catatan_verifikasi: "Perlu rekap bulanan", penanggung_jawab: "Kaur TU", tanggal_pembaruan: "2026-02-28" },
+            { id: "4", kode_bukti: "7.1.a", bidang: "Manajerial", nomor_map: "Map 7", nama_indikator: "Pengembangan Kurikulum Sekolah", nama_bukti: "Dokumen KTSP / KOSP SMPN 3 Cisarua 2026", link_dokumen: "https://drive.google.com/file/d/sample7", status: "Lengkap", keterangan_sumber: "Telah disahkan Pengawas", catatan_verifikasi: "Lengkap & Valid", penanggung_jawab: "Wakasek Kurikulum", tanggal_pembaruan: "2026-03-02" },
+            { id: "5", kode_bukti: "10.1.a", bidang: "Supervisi", nomor_map: "Map 10", nama_indikator: "Program Supervisi Akademik", nama_bukti: "SK Tim Supervisi & Program Kerja 2026", link_dokumen: "https://drive.google.com/file/d/sample10", status: "Proses", keterangan_sumber: "Draft selesai", catatan_verifikasi: "Menunggu persetujuan Kepsek", penanggung_jawab: "Kepala Sekolah", tanggal_pembaruan: "2026-03-03" }
+        ];
+
+        function App() {
+            const [documents, setDocuments] = useState(() => {
+                const saved = localStorage.getItem("pkks_docs_2026");
+                return saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
+            });
+            const [apiUrl, setApiUrl] = useState(() => {
+                return localStorage.getItem("pkks_api_url") || "";
+            });
+            const [isLoadingApi, setIsLoadingApi] = useState(false);
+            const [activeTab, setActiveTab] = useState("dashboard");
+            const [searchTerm, setSearchTerm] = useState("");
+            const [filterMap, setFilterMap] = useState("Semua");
+            const [filterStatus, setFilterStatus] = useState("Semua");
+            const [filterBidang, setFilterBidang] = useState("Semua");
+            const [filterLink, setFilterLink] = useState("Semua");
+            const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+            
+            const [editingDoc, setEditingDoc] = useState(null);
+            const [isAddingDoc, setIsAddingDoc] = useState(false);
+            const [importLogs, setImportLogs] = useState(null);
+            const [currentUser] = useState({ nama: "Admin PKKS", peran: "Tim Penilai / Admin" });
+            const [newDocData, setNewDocData] = useState({
+                kode_bukti: "", bidang: "Manajerial", nomor_map: "Map 1", nama_indikator: "",
+                nama_bukti: "", link_dokumen: "", status: "Belum Diverifikasi", keterangan_sumber: "",
+                catatan_verifikasi: "", penanggung_jawab: ""
+            });
+
+            useEffect(() => {
+                localStorage.setItem("pkks_docs_2026", JSON.stringify(documents));
+            }, [documents]);
+
+            useEffect(() => {
+                localStorage.setItem("pkks_api_url", apiUrl);
+            }, [apiUrl]);
+
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+
+            const stats = useMemo(() => {
+                const total = documents.length;
+                const lengkap = documents.filter(d => d.status === "Lengkap").length;
+                const proses = documents.filter(d => d.status === "Proses").length;
+                const belumTersedia = documents.filter(d => d.status === "Belum Tersedia").length;
+                const belumDiverifikasi = documents.filter(d => d.status === "Belum Diverifikasi").length;
+                const adaLink = documents.filter(d => d.link_dokumen && d.link_dokumen.trim() !== "").length;
+                const tanpaLink = total - adaLink;
+                const persentase = total > 0 ? Math.round((lengkap / total) * 100) : 0;
+
+                return { total, lengkap, proses, belumTersedia, belumDiverifikasi, adaLink, tanpaLink, persentase };
+            }, [documents]);
+
+            const fetchFromGoogleScript = async (urlToFetch = apiUrl) => {
+                if (!urlToFetch) {
+                    setImportLogs({ success: false, message: "Masukkan URL Web App Google Apps Script!" });
+                    return;
+                }
+                setIsLoadingApi(true);
+                setImportLogs(null);
+
+                try {
+                    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+                    const cleanUrl = urlToFetch.split('?')[0];
+                    const script = document.createElement('script');
+
+                    window[callbackName] = function(data) {
+                        delete window[callbackName];
+                        if (document.body.contains(script)) document.body.removeChild(script);
+                        
+                        if (Array.isArray(data) && data.length > 0) {
+                            setDocuments(data);
+                            setImportLogs({ success: true, message: `Berhasil sinkronisasi ${data.length} data dari Google Spreadsheet!` });
+                        } else {
+                            setImportLogs({ success: false, message: "Data spreadsheet kosong atau format belum disesuaikan." });
+                        }
+                        setIsLoadingApi(false);
+                    };
+
+                    script.src = `${cleanUrl}?action=get_all&callback=${callbackName}`;
+                    script.onerror = function() {
+                        delete window[callbackName];
+                        if (document.body.contains(script)) document.body.removeChild(script);
+                        setImportLogs({ success: false, message: "Gagal terhubung ke Apps Script API. Pastikan akses diset ke 'Anyone'." });
+                        setIsLoadingApi(false);
+                    };
+
+                    document.body.appendChild(script);
+                } catch (err) {
+                    setImportLogs({ success: false, message: "Koneksi Gagal: " + err.message });
+                    setIsLoadingApi(false);
+                }
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    try {
+                        const bstr = evt.target.result;
+                        const workbook = XLSX.read(bstr, { type: 'binary' });
+                        let importedDocs = [];
+
+                        workbook.SheetNames.forEach((sheetName) => {
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                            
+                            if (json.length > 1) {
+                                const numMapMatch = sheetName.match(/\d+/);
+                                const numMap = numMapMatch ? parseInt(numMapMatch[0], 10) : 1;
+                                const bidang = (numMap <= 9) ? "Manajerial" : "Supervisi";
+
+                                for (let i = 1; i < json.length; i++) {
+                                    const row = json[i];
+                                    if (row && (row[0] || row[1])) {
+                                        importedDocs.push({
+                                            id: `${sheetName.replace(/\s+/g, '_')}_${i}`,
+                                            kode_bukti: (row[0] || `ID-${i}`).toString().trim(),
+                                            nomor_map: sheetName.toLowerCase().includes("map") ? sheetName : `Map ${numMap}`,
+                                            bidang: bidang,
+                                            nama_indikator: (row[1] || row[0] || "Indikator PKKS").toString().trim(),
+                                            nama_bukti: (row[2] || row[1] || "Bukti Fisik").toString().trim(),
+                                            link_dokumen: (row[3] || "").toString().trim(),
+                                            status: (row[4] || "Belum Diverifikasi").toString().trim(),
+                                            keterangan_sumber: (row[5] || "").toString().trim(),
+                                            catatan_verifikasi: "",
+                                            penanggung_jawab: "",
+                                            tanggal_pembaruan: new Date().toISOString().split('T')[0]
+                                        });
+                                    }
+                                }
+                            }
+                        });
+
+                        if (importedDocs.length > 0) {
+                            setDocuments(importedDocs);
+                            setImportLogs({ success: true, message: `Berhasil mengimpor ${importedDocs.length} data dari Excel!` });
+                        }
+                    } catch (err) {
+                        setImportLogs({ success: false, message: "Gagal impor: " + err.message });
+                    }
+                };
+                reader.readAsBinaryString(file);
+            };
+
+            const filteredDocuments = useMemo(() => {
+                return documents.filter(doc => {
+                    const matchSearch = doc.nama_bukti.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        doc.kode_bukti.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        doc.nama_indikator.toLowerCase().includes(searchTerm.toLowerCase());
+                    const matchMap = filterMap === "Semua" || doc.nomor_map === filterMap;
+                    const matchStatus = filterStatus === "Semua" || doc.status === filterStatus;
+                    const matchBidang = filterBidang === "Semua" || doc.bidang === filterBidang;
+                    const matchLink = filterLink === "Semua" || 
+                        (filterLink === "Ada Tautan" && doc.link_dokumen && doc.link_dokumen !== "") ||
+                        (filterLink === "Tanpa Tautan" && (!doc.link_dokumen || doc.link_dokumen === ""));
+
+                    return matchSearch && matchMap && matchStatus && matchBidang && matchLink;
+                });
+            }, [documents, searchTerm, filterMap, filterStatus, filterBidang, filterLink]);
+
+            const handleSaveDoc = (e) => {
+                e.preventDefault();
+                setDocuments(prev => prev.map(d => d.id === editingDoc.id ? editingDoc : d));
+                setEditingDoc(null);
+            };
+
+            const handleCreateDoc = (e) => {
+                e.preventDefault();
+                const created = {
+                    ...newDocData,
+                    id: `doc-${Date.now()}`,
+                    tanggal_pembaruan: new Date().toISOString().split('T')[0]
+                };
+                setDocuments(prev => [created, ...prev]);
+                setIsAddingDoc(false);
+                setNewDocData({
+                    kode_bukti: "", bidang: "Manajerial", nomor_map: "Map 1", nama_indikator: "",
+                    nama_bukti: "", link_dokumen: "", status: "Belum Diverifikasi", keterangan_sumber: "",
+                    catatan_verifikasi: "", penanggung_jawab: ""
+                });
+            };
+
+            const navigateTab = (tab, bidang = "Semua", map = "Semua", status = "Semua", link = "Semua") => {
+                setActiveTab(tab);
+                setFilterBidang(bidang);
+                setFilterMap(map);
+                setFilterStatus(status);
+                setFilterLink(link);
+                setIsMobileMenuOpen(false);
+            };
+
+            return (
+                <div class="min-h-screen flex flex-col md:flex-row bg-slate-100">
+                    
+                    {isMobileMenuOpen && (
+                        <div onClick={() => setIsMobileMenuOpen(false)} class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden"></div>
+                    )}
+
+                    {/* SIDEBAR NAVIGATION */}
+                    <aside class={`fixed md:static inset-y-0 left-0 w-72 md:w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 shadow-xl z-50 transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+                        <div class="p-4 bg-slate-950 flex items-center justify-between border-b border-slate-800">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-lg">S3C</div>
+                                <div>
+                                    <h1 class="font-bold text-white text-sm leading-tight">SMPN 3 CISARUA</h1>
+                                    <p class="text-xs text-blue-400 font-medium">PKKS 2026 Dashboard</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsMobileMenuOpen(false)} class="md:hidden text-slate-400">
+                                <i data-lucide="x" class="w-6 h-6"></i>
+                            </button>
+                        </div>
+
+                        <nav class="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar text-sm font-medium">
+                            <button onClick={() => navigateTab('dashboard')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${activeTab==='dashboard'?'bg-blue-600 text-white':'hover:bg-slate-800 text-slate-400'}`}>
+                                <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard Utama
+                            </button>
+                            <button onClick={() => navigateTab('data')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${activeTab==='data' && filterBidang==='Semua'?'bg-blue-600 text-white':'hover:bg-slate-800 text-slate-400'}`}>
+                                <i data-lucide="file-text" class="w-4 h-4"></i> Data Administrasi
+                            </button>
+                            <button onClick={() => navigateTab('data', 'Manajerial')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${activeTab==='data' && filterBidang==='Manajerial'?'bg-blue-600 text-white':'hover:bg-slate-800 text-slate-400'}`}>
+                                <i data-lucide="briefcase" class="w-4 h-4"></i> Bidang Manajerial
+                            </button>
+                            <button onClick={() => navigateTab('data', 'Supervisi')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${activeTab==='data' && filterBidang==='Supervisi'?'bg-blue-600 text-white':'hover:bg-slate-800 text-slate-400'}`}>
+                                <i data-lucide="user-check" class="w-4 h-4"></i> Bidang Supervisi
+                            </button>
+                            <button onClick={() => navigateTab('rekap')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${activeTab==='rekap'?'bg-blue-600 text-white':'hover:bg-slate-800 text-slate-400'}`}>
+                                <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Rekapitulasi PKKS
+                            </button>
+                            <button onClick={() => navigateTab('import')} class={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg ${activeTab==='import'?'bg-blue-600 text-white':'hover:bg-slate-800 text-slate-400'}`}>
+                                <i data-lucide="upload-cloud" class="w-4 h-4"></i> Import File Excel / API
+                            </button>
+                        </nav>
+                    </aside>
+
+                    {/* MAIN CONTENT AREA */}
+                    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+                        
+                        <header class="bg-white border-b border-slate-200 px-4 md:px-6 py-3.5 flex items-center justify-between gap-3 shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <button onClick={() => setIsMobileMenuOpen(true)} class="md:hidden p-2 rounded-lg bg-slate-100 text-slate-700">
+                                    <i data-lucide="menu" class="w-5 h-5"></i>
+                                </button>
+                                <div>
+                                    <h2 class="text-base md:text-xl font-bold text-slate-800 leading-tight">DASHBOARD PKKS 2026</h2>
+                                    <p class="text-[11px] md:text-xs text-slate-500 font-medium">SMP NEGERI 3 CISARUA</p>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={() => { setNewDocData(prev => ({ ...prev, bidang: filterBidang !== 'Semua' ? filterBidang : 'Manajerial' })); setIsAddingDoc(true); }}
+                                class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition"
+                            >
+                                <i data-lucide="plus-circle" class="w-4 h-4"></i> Tambah Dokumen
+                            </button>
+                        </header>
+
+                        <main class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+
+                            {/* DASHBOARD UTAMA */}
+                            {activeTab === 'dashboard' && (
+                                <div class="space-y-6">
+                                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                            <div>
+                                                <p class="text-[10px] md:text-xs font-semibold uppercase text-slate-500">Total Bukti</p>
+                                                <p class="text-xl md:text-2xl font-bold text-slate-800 mt-1">{stats.total}</p>
+                                            </div>
+                                            <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+                                                <i data-lucide="files" class="w-5 h-5"></i>
+                                            </div>
+                                        </div>
+
+                                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                            <div>
+                                                <p class="text-[10px] md:text-xs font-semibold uppercase text-emerald-600">Dokumen Lengkap</p>
+                                                <p class="text-xl md:text-2xl font-bold text-emerald-600 mt-1">{stats.lengkap}</p>
+                                            </div>
+                                            <div class="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                                            </div>
+                                        </div>
+
+                                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                            <div>
+                                                <p class="text-[10px] md:text-xs font-semibold uppercase text-amber-600">Dalam Proses</p>
+                                                <p class="text-xl md:text-2xl font-bold text-amber-600 mt-1">{stats.proses}</p>
+                                            </div>
+                                            <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
+                                                <i data-lucide="clock" class="w-5 h-5"></i>
+                                            </div>
+                                        </div>
+
+                                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                                            <div>
+                                                <p class="text-[10px] md:text-xs font-semibold uppercase text-rose-600">Belum Ada</p>
+                                                <p class="text-xl md:text-2xl font-bold text-rose-600 mt-1">{stats.belumTersedia + stats.belumDiverifikasi}</p>
+                                            </div>
+                                            <div class="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center">
+                                                <i data-lucide="alert-circle" class="w-5 h-5"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="font-bold text-slate-800 text-sm md:text-base">Persentase Kelengkapan Administrasi</h3>
+                                            <span class="text-2xl font-extrabold text-blue-600">{stats.persentase}%</span>
+                                        </div>
+                                        <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                                            <div class="h-full bg-blue-600 transition-all duration-500" style={{ width: `${stats.persentase}%` }}></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* DATA ADMINISTRASI */}
+                            {activeTab === 'data' && (
+                                <div class="space-y-4">
+                                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        <input 
+                                            type="text" 
+                                            placeholder="Cari kode/bukti..." 
+                                            value={searchTerm} 
+                                            onChange={e => setSearchTerm(e.target.value)}
+                                            class="w-full px-3 py-2 border rounded-lg text-xs"
+                                        />
+                                        <select value={filterBidang} onChange={e => setFilterBidang(e.target.value)} class="border rounded-lg px-3 py-2 text-xs bg-white">
+                                            <option value="Semua">Semua Bidang</option>
+                                            <option value="Manajerial">Manajerial</option>
+                                            <option value="Supervisi">Supervisi</option>
+                                        </select>
+                                        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} class="border rounded-lg px-3 py-2 text-xs bg-white">
+                                            <option value="Semua">Semua Status</option>
+                                            <option value="Lengkap">Lengkap</option>
+                                            <option value="Proses">Proses</option>
+                                            <option value="Belum Tersedia">Belum Tersedia</option>
+                                        </select>
+                                        <select value={filterMap} onChange={e => setFilterMap(e.target.value)} class="border rounded-lg px-3 py-2 text-xs bg-white">
+                                            <option value="Semua">Semua Map (1-12)</option>
+                                            {[...Array(12)].map((_, i) => (
+                                                <option key={i} value={`Map ${i+1}`}>Map {i+1}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* TABLE VIEW */}
+                                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+                                        <table class="w-full text-left text-xs">
+                                            <thead class="bg-slate-50 border-b font-bold text-slate-700">
+                                                <tr>
+                                                    <th class="p-3">Kode</th>
+                                                    <th class="p-3">Map & Bidang</th>
+                                                    <th class="p-3">Bukti Fisik</th>
+                                                    <th class="p-3">Status</th>
+                                                    <th class="p-3">Link URL</th>
+                                                    <th class="p-3 text-center">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-100">
+                                                {filteredDocuments.map(doc => (
+                                                    <tr key={doc.id} class="hover:bg-slate-50">
+                                                        <td class="p-3 font-bold">{doc.kode_bukti}</td>
+                                                        <td class="p-3">{doc.nomor_map} ({doc.bidang})</td>
+                                                        <td class="p-3 font-semibold">{doc.nama_bukti}</td>
+                                                        <td class="p-3">
+                                                            <span class="px-2 py-0.5 rounded font-bold text-[10px] bg-slate-100">{doc.status}</span>
+                                                        </td>
+                                                        <td class="p-3">
+                                                            {doc.link_dokumen ? <a href={doc.link_dokumen} target="_blank" class="text-blue-600 font-semibold">Buka Link</a> : <span class="text-rose-400">Kosong</span>}
+                                                        </td>
+                                                        <td class="p-3 text-center">
+                                                            <button onClick={() => setEditingDoc(doc)} class="px-2 py-1 bg-slate-100 text-slate-700 rounded font-semibold">Edit</button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* IMPORT TAB */}
+                            {activeTab === 'import' && (
+                                <div class="max-w-xl mx-auto space-y-4">
+                                    <div class="bg-white p-5 rounded-xl border border-blue-200 space-y-3">
+                                        <h3 class="font-bold text-slate-800 text-sm">Hubungkan ke Google Apps Script Web App</h3>
+                                        <div class="flex gap-2">
+                                            <input 
+                                                type="url" 
+                                                placeholder="https://script.google.com/macros/s/.../exec"
+                                                value={apiUrl}
+                                                onChange={e => setApiUrl(e.target.value)}
+                                                class="flex-1 px-3 py-2 border rounded-lg text-xs"
+                                            />
+                                            <button onClick={() => fetchFromGoogleScript()} class="bg-blue-600 text-white text-xs px-4 py-2 rounded-lg font-semibold">
+                                                {isLoadingApi ? 'Loading...' : 'Tarik Data'}
+                                            </button>
+                                        </div>
+                                        {importLogs && <p class="text-xs font-semibold text-blue-600">{importLogs.message}</p>}
+                                    </div>
+                                </div>
+                            )}
+
+                        </main>
+                    </div>
+
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
