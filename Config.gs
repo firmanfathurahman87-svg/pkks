@@ -5,7 +5,7 @@ const APP_CONFIG = {
   year: 2026,
   timezone: 'Asia/Jakarta',
   // GANTI dengan email Google administrator sekolah sebelum deployment.
-  adminEmails: ['ganti-email-admin@sekolah.sch.id'],
+  adminEmails: ['firmanfathurahman87@guru.smp.belajar.id'],
   // Tambahkan email kepala sekolah/tim jika ingin menetapkan peran secara khusus.
   principalEmails: [],
   teamEmails: []
