@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div id="loading" class="loading-screen"><div class="spinner"></div><b>Menyiapkan SIP-PKKS 2026…</b><small>Memuat data sekolah</small></div>
+  <div class="app-shell" id="appShell" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">PKKS</div>
+        <div><strong>SIP-PKKS</strong><small>TAHUN 2026</small></div>
+        <button class="icon-btn close-side" onclick="toggleSide()" aria-label="Tutup menu">×</button>
+      </div>
+      <div class="school-mini"><div class="school-avatar">S3</div><div><b>SMP Negeri 3 Cisarua</b><small>Bandung Barat, Jawa Barat</small></div></div>
+      <nav class="side-nav">
+        <button class="nav-item active" data-view="dashboard" onclick="navigate('dashboard')"><span>▦</span> Beranda</button>
+        <div class="nav-label">MENU PKKS</div>
+        <div id="mapNav"></div>
+        <button class="nav-item" data-view="reports" onclick="navigate('reports')"><span>▤</span> Laporan & Ekspor</button>
+        <button class="nav-item" data-view="activity" onclick="navigate('activity')"><span>◷</span> Riwayat Aktivitas</button>
+      </nav>
+      <div class="side-footer"><span class="status-dot"></span> Tahun Penilaian 2026</div>
+    </aside>
+    <div class="scrim" id="scrim" onclick="toggleSide()"></div>
+    <main class="main-area">
+      <header class="topbar">
+        <button class="icon-btn hamburger" onclick="toggleSide()" aria-label="Buka menu">☰</button>
+        <div class="top-title"><span class="eyebrow">SISTEM INFORMASI SEKOLAH</span><b id="pageTitle">Beranda</b></div>
+        <div class="top-actions">
+          <button class="icon-btn" onclick="toggleTheme()" title="Ubah tema">◐</button>
+          <div class="user-pill"><div class="user-avatar">U</div><div><b id="userEmail">Pengguna</b><small id="userRole">Viewer</small></div></div>
+        </div>
+      </header>
+      <section class="content">
+        <div id="notice" class="notice" hidden></div>
+        <div id="view-dashboard" class="view">
+          <div class="welcome">
+            <div><div class="eyebrow light">PENILAIAN KINERJA KEPALA SEKOLAH · 2026</div><h1>Dashboard PKKS</h1><p>Pantau kelengkapan bukti dan tindak lanjut penilaian dalam satu tempat.</p></div>
+            <div class="welcome-badge"><span>12</span><small>MAP PKKS</small></div>
+          </div>
+          <div class="stats-grid" id="stats"></div>
+          <div class="section-heading"><div><h2>Progres per Map</h2><p>Persentase bukti berstatus lengkap dan terverifikasi.</p></div><button class="btn btn-light" onclick="navigate('reports')">Lihat laporan ↗</button></div>
+          <div class="map-grid" id="mapCards"></div>
+          <div class="bottom-grid">
+            <div class="panel"><div class="panel-head"><div><h3>Status Bukti</h3><p>Ringkasan kondisi seluruh dokumen</p></div></div><div id="statusSummary" class="status-summary"></div></div>
+            <div class="panel"><div class="panel-head"><div><h3>Aktivitas Terbaru</h3><p>Perubahan data terakhir</p></div></div><div id="recentActivity" class="activity-list"></div></div>
+          </div>
+        </div>
+        <div id="view-map" class="view" hidden>
+          <div class="page-intro"><div><div class="eyebrow">DAFTAR BUKTI</div><h1 id="mapHeading">Map PKKS</h1><p id="mapSubheading"></p></div><button id="addBtn" class="btn btn-primary" onclick="openAdd()" hidden>＋ Tambah Bukti</button></div>
+          <div class="filter-panel">
+            <div class="search-wrap"><span>⌕</span><input id="searchInput" type="search" placeholder="Cari kode, indikator, atau bukti fisik…" oninput="debouncedSearch()"></div>
+            <select id="statusFilter" onchange="loadEvidence()" aria-label="Filter status"><option value="">Semua status</option><option>Belum diperiksa</option><option>Belum tersedia</option><option>Dalam proses</option><option>Tersedia, perlu perbaikan</option><option>Lengkap dan terverifikasi</option></select>
+            <button class="btn btn-light" onclick="clearFilters()">Reset</button>
+          </div>
+          <div class="result-line" id="resultLine"></div>
+          <div id="evidenceList" class="evidence-list"></div>
+        </div>
+        <div id="view-reports" class="view" hidden>
+          <div class="page-intro"><div><div class="eyebrow">REKAPITULASI</div><h1>Laporan & Ekspor</h1><p>Ringkasan kelengkapan bukti PKKS tahun 2026.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="importBtn" class="btn btn-light" onclick="openImportModal()" hidden>⇧ Import Excel</button><button class="btn btn-primary" onclick="window.print()">⎙ Cetak laporan</button></div></div>
+          <div id="reportSummary" class="stats-grid"></div>
+          <div class="panel report-panel"><div class="panel-head"><div><h3>Rekap per Map</h3><p>Data status terbaru dari database.</p></div><button class="btn btn-light" onclick="downloadCsv()">⇩ Ekspor CSV</button></div><div id="reportTable"></div></div>
+          <div class="panel"><div class="panel-head"><div><h3>Catatan penggunaan</h3><p>Pastikan bukti diverifikasi sebelum laporan disampaikan.</p></div></div><p class="muted">Status “Lengkap dan terverifikasi” hanya ditetapkan petugas berwenang. Tautan dokumen yang tersedia tidak otomatis berarti bukti sudah valid.</p></div>
+        </div>
+        <div id="view-activity" class="view" hidden>
+          <div class="page-intro"><div><div class="eyebrow">AUDIT DATA</div><h1>Riwayat Aktivitas</h1><p>Log perubahan data bukti PKKS.</p></div><button class="btn btn-light" onclick="loadActivity()">↻ Perbarui</button></div>
+          <div class="panel"><div id="activityTable" class="activity-list"></div></div>
+        </div>
+        <footer class="app-footer">SIP-PKKS 2026 · SMP Negeri 3 Cisarua <span>Data tersimpan di Google Sheets</span></footer>
+      </section>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="modalBackdrop" hidden onclick="backdropClose(event)">
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head"><div><div class="eyebrow">DETAIL BUKTI PKKS</div><h2 id="modalTitle">Perbarui Bukti</h2></div><button class="icon-btn" onclick="closeModal()" aria-label="Tutup">×</button></div>
+      <div id="modalBody"></div>
+    </section>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <?!= include('Scripts'); ?>
+</body>
+</html>
